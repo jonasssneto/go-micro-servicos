@@ -20,41 +20,73 @@ type Products struct {
 	Products []Product
 }
 
-func loadData() []byte {
+func loadData() ([]byte, error) {
 	jsonFile, err := os.Open("products.json")
 	if err != nil {
-		fmt.Println("erro: ", err.Error())
+		return nil, fmt.Errorf("error opening file: %v", err)
 	}
 	defer jsonFile.Close()
 
 	data, err := io.ReadAll(jsonFile)
-	return data
+	if err != nil {
+		return nil, fmt.Errorf("error reading file: %v", err)
+	}
+
+	return data, nil
 }
 
 func listProducts(w http.ResponseWriter, r *http.Request) {
-	products := loadData()
-	w.Write([]byte(products))
+	data, err := loadData()
+	if err != nil {
+		http.Error(w, "Error loading products", http.StatusInternalServerError)
+		fmt.Println("Error loading products:", err)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(data)
 }
 
 func getProductById(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
-	data := loadData()
+	data, err := loadData()
+	if err != nil {
+		http.Error(w, "Error loading products", http.StatusInternalServerError)
+		fmt.Println("Error loading products:", err)
+		return
+	}
 
 	var products Products
-	json.Unmarshal(data, &products)
+	if err := json.Unmarshal(data, &products); err != nil {
+		http.Error(w, "Error unmarshalling products", http.StatusInternalServerError)
+		fmt.Println("Error unmarshalling products:", err)
+		return
+	}
 
 	for _, v := range products.Products {
 		if v.Uuid == vars["id"] {
-			product, _ := json.Marshal(v)
-			w.Write([]byte(product))
+			product, err := json.Marshal(v)
+			if err != nil {
+				http.Error(w, "Error marshalling product", http.StatusInternalServerError)
+				fmt.Println("Error marshalling product:", err)
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			w.Write(product)
+			return
 		}
 	}
+
+	http.Error(w, "Product not found", http.StatusNotFound)
 }
 
 func main() {
 	r := mux.NewRouter()
-	r.HandleFunc("/products", listProducts)
-	r.HandleFunc("/products/{id}", getProductById)
+	r.HandleFunc("/products", listProducts).Methods("GET")
+	r.HandleFunc("/products/{id}", getProductById).Methods("GET")
 
-	http.ListenAndServe(":8081", r)
+	fmt.Println("Server running at http://localhost:8081")
+	if err := http.ListenAndServe(":8081", r); err != nil {
+		fmt.Printf("Failed to start server: %v\n", err)
+	}
 }
