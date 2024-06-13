@@ -40,13 +40,14 @@ func init() {
 
 func displayCheckout(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
-	response, err := http.Get(productsUrl + "/product/" + vars["id"])
+	response, err := http.Get(productsUrl + "/products/" + vars["id"])
+
 	if err != nil {
 		fmt.Printf("The HTTP request failed with error %s\n", err)
 	}
 
 	data, _ := io.ReadAll(response.Body)
-	fmt.Println(string(data))
+	log.Println(string(data))
 
 	var product Product
 	json.Unmarshal(data, &product)
@@ -73,7 +74,10 @@ func finish(w http.ResponseWriter, r *http.Request) {
 
 func main() {
 	r := mux.NewRouter()
-	r.HandleFunc("/finish", finish)
-	r.HandleFunc("/{id}", displayCheckout)
-	http.ListenAndServe(":8082", r)
+	r.HandleFunc("/finish", finish).Methods("POST")
+	r.HandleFunc("/{id}", displayCheckout).Methods("GET")
+	log.Println("Server running on port 8083")
+	if err := http.ListenAndServe(":8083", r); err != nil {
+		log.Fatalf("Server failed to start: %v", err)
+	}
 }
