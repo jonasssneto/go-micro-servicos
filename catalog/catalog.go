@@ -5,10 +5,12 @@ import (
 	"fmt"
 	"html/template"
 	"io"
+	"log"
 	"net/http"
 	"os"
 
 	"github.com/gorilla/mux"
+	"github.com/joho/godotenv"
 )
 
 type Product struct {
@@ -24,7 +26,12 @@ type Products struct {
 var productsUrl string
 
 func init() {
-	productsUrl = os.Getenv("PRODUCTS_URL")
+	err := godotenv.Load()
+	if err != nil {
+		log.Fatal("Erro ao carregar o arquivo .env")
+	}
+
+	productsUrl = os.Getenv("PRODUCT_URL")
 }
 
 func loadProducts() ([]Product, error) {
