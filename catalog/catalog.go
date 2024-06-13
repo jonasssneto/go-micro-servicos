@@ -22,42 +22,91 @@ type Products struct {
 
 var productsUrl = "http://localhost:8081"
 
-func loadProducts() []Product {
-	fmt.Println(productsUrl + "/products")
+func loadProducts() ([]Product, error) {
 	response, err := http.Get(productsUrl + "/products")
 	if err != nil {
-		fmt.Println("erro http:" + err.Error())
+		return nil, fmt.Errorf("error fetching products: %v", err)
 	}
-	data, _ := io.ReadAll(response.Body)
+	defer response.Body.Close()
+
+	if response.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("unexpected status code: %v", response.StatusCode)
+	}
+
+	data, err := io.ReadAll(response.Body)
+	if err != nil {
+		return nil, fmt.Errorf("error reading response body: %v", err)
+	}
 
 	var products Products
+	if err := json.Unmarshal(data, &products); err != nil {
+		return nil, fmt.Errorf("error unmarshalling response: %v", err)
+	}
 
-	json.Unmarshal(data, &products)
-
-	fmt.Println(data)
-
-	return products.Products
+	return products.Products, nil
 }
 
 func listProducts(w http.ResponseWriter, r *http.Request) {
-	products := loadProducts()
-	t := template.Must((template.ParseFiles("templates/catalog.html")))
-	t.Execute(w, products)
+	products, err := loadProducts()
+	if err != nil {
+		http.Error(w, "Error loading products", http.StatusInternalServerError)
+		fmt.Println("Error loading products:", err)
+		return
+	}
+
+	t, err := template.ParseFiles("templates/catalog.html")
+	if err != nil {
+		http.Error(w, "Error parsing template", http.StatusInternalServerError)
+		fmt.Println("Error parsing template:", err)
+		return
+	}
+
+	if err := t.Execute(w, products); err != nil {
+		http.Error(w, "Error executing template", http.StatusInternalServerError)
+		fmt.Println("Error executing template:", err)
+	}
 }
 
 func showProducts(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
-	response, err := http.Get(productsUrl + "/products" + vars["id"])
+	response, err := http.Get(productsUrl + "/products/" + vars["id"])
 	if err != nil {
-		fmt.Println("erro http:" + err.Error())
+		http.Error(w, "Error fetching product", http.StatusInternalServerError)
+		fmt.Println("Error fetching product:", err)
+		return
 	}
-	data, _ := io.ReadAll(response.Body)
+	defer response.Body.Close()
+
+	if response.StatusCode != http.StatusOK {
+		http.Error(w, "Product not found", http.StatusNotFound)
+		return
+	}
+
+	data, err := io.ReadAll(response.Body)
+	if err != nil {
+		http.Error(w, "Error reading response body", http.StatusInternalServerError)
+		fmt.Println("Error reading response body:", err)
+		return
+	}
 
 	var product Product
-	json.Unmarshal(data, &product)
+	if err := json.Unmarshal(data, &product); err != nil {
+		http.Error(w, "Error unmarshalling product data", http.StatusInternalServerError)
+		fmt.Println("Error unmarshalling product data:", err)
+		return
+	}
 
-	t := template.Must((template.ParseFiles("templates/view.html")))
-	t.Execute(w, product)
+	t, err := template.ParseFiles("templates/view.html")
+	if err != nil {
+		http.Error(w, "Error parsing template", http.StatusInternalServerError)
+		fmt.Println("Error parsing template:", err)
+		return
+	}
+
+	if err := t.Execute(w, product); err != nil {
+		http.Error(w, "Error executing template", http.StatusInternalServerError)
+		fmt.Println("Error executing template:", err)
+	}
 }
 
 func main() {
