@@ -84,7 +84,6 @@ func main() {
 	r := mux.NewRouter()
 	r.HandleFunc("/products", listProducts).Methods("GET")
 	r.HandleFunc("/products/{id}", getProductById).Methods("GET")
-
 	fmt.Println("Server running at http://localhost:8081")
 	if err := http.ListenAndServe(":8081", r); err != nil {
 		fmt.Printf("Failed to start server: %v\n", err)

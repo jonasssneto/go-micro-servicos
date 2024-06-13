@@ -6,6 +6,7 @@ import (
 	"html/template"
 	"io"
 	"net/http"
+	"os"
 
 	"github.com/gorilla/mux"
 )
@@ -20,7 +21,11 @@ type Products struct {
 	Products []Product
 }
 
-var productsUrl = "http://localhost:8081"
+var productsUrl string
+
+func init() {
+	productsUrl = os.Getenv("PRODUCTS_URL")
+}
 
 func loadProducts() ([]Product, error) {
 	response, err := http.Get(productsUrl + "/products")
@@ -113,5 +118,9 @@ func main() {
 	r := mux.NewRouter()
 	r.HandleFunc("/", listProducts)
 	r.HandleFunc("/products/{id}", showProducts)
-	http.ListenAndServe(":8082", r)
+	fmt.Println("Server running at http://localhost:8082")
+
+	if err := http.ListenAndServe(":8082", r); err != nil {
+		fmt.Printf("Failed to start server: %v\n", err)
+	}
 }
