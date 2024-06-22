@@ -1,11 +1,16 @@
 package main
 
 import (
+	"catalog/db"
 	"catalog/queue"
+	"encoding/json"
+	"flag"
 	"log"
-	"os"
+	"time"
 
 	"github.com/joho/godotenv"
+	uuid "github.com/nu7hatch/gouuid"
+	"github.com/streadway/amqp"
 )
 
 type Product struct {
@@ -24,24 +29,67 @@ type Order struct {
 	CreatedAt string `json:"created_at"`
 }
 
-var productsUrl string
-
 func init() {
 	err := godotenv.Load()
 	if err != nil {
 		log.Fatal("Erro ao carregar o arquivo .env")
 	}
+}
 
-	productsUrl = os.Getenv("PRODUCT_URL")
+func createOrder(payload []byte) Order {
+	var order Order
+	json.Unmarshal(payload, &order)
+
+	uuid, _ := uuid.NewV4()
+	order.Uuid = uuid.String()
+	order.Status = "pending"
+	order.CreatedAt = time.Now().String()
+	saveOrder(order)
+
+	return order
+}
+
+func saveOrder(order Order) {
+	json, _ := json.Marshal(order)
+
+	connection := db.Connect()
+
+	err := connection.Set(order.Uuid, json, 0).Err()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	log.Println("Order saved with success")
+}
+
+func notifyOrderCreated(order Order, ch *amqp.Channel) {
+	json, _ := json.Marshal(order)
+
+	queue.Notify(json, "order_ex", "", ch)
 }
 
 func main() {
+	var param string
+	flag.StringVar(&param, "opt", "", "Usage")
+	flag.Parse()
+
 	in := make(chan []byte)
-
 	connection := queue.Connect()
-	queue.StartConsuming(connection, in)
 
-	for payload := range in {
-		log.Println(string(payload))
+	switch param {
+	case "checkout":
+		queue.StartConsuming("checkout_queue", connection, in)
+		for payload := range in {
+			notifyOrderCreated(createOrder(payload), connection)
+			log.Println(string(payload))
+		}
+	case "payment":
+		queue.StartConsuming("payment_queue", connection, in)
+		var order Order
+		for payload := range in {
+			json.Unmarshal(payload, &order)
+			saveOrder(order)
+			log.Println("Payment: ", string(payload))
+		}
 	}
 }

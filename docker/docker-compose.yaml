@@ -1,6 +1,5 @@
-version: '3'
+version: "3"
 services:
-
   rabbit:
     image: "rabbitmq:3-management"
     environment:
@@ -12,6 +11,6 @@ services:
       - "15672:15672"
       - "5672:5672"
   redis:
-    image: 'redis:latest'
+    image: "redis:latest"
     ports:
       - "6379:6379"
