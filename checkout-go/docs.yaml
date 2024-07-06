@@ -1,0 +1,50 @@
+swagger: '2.0'
+info:
+  version: "1.0.0"
+  title: "API de Checkout"
+  description: "Documentação da API para checkout de produtos"
+host: "localhost:8001"
+basePath: "/v1"
+schemes:
+  - "https"
+  - "http"
+tags:
+  - name: "checkout"
+    description: "Operações de checkout de produtos"
+paths:
+  /checkout:
+    post:
+      tags:
+        - "checkout"
+      summary: "Processa a compra do produto"
+      description: "Processa a compra do produto e envia para o RabbitMQ"
+      parameters:
+        - in: "body"
+          name: "body"
+          description: "Detalhes do cliente e do produto para o checkout"
+          required: true
+          schema:
+            $ref: "#/definitions/CheckoutInput"
+      responses:
+        200:
+          description: "Checkout realizado com sucesso"
+        400:
+          description: "Requisição inválida"
+        500:
+          description: "Erro interno no servidor"
+definitions:
+  CheckoutInput:
+    type: "object"
+    properties:
+      name:
+        type: "string"
+        example: "Jonas"
+      email:
+        type: "string"
+        example: "email@gmail.com"
+      phone:
+        type: "string"
+        example: "00000000"
+      product_id:
+        type: "string"
+        example: "1"

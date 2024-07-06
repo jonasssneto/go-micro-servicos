@@ -1,0 +1,88 @@
+version: "3.9"
+
+services:
+  db:
+    container_name: db
+    image: postgres:latest
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: admin
+      POSTGRES_DB: postgres
+    ports:
+      - "5432:5432"
+    networks:
+      - app
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  rabbit:
+    container_name: rabbitMQ
+    image: "rabbitmq:3-management"
+    environment:
+      RABBITMQ_ERLANG_COOKIE: "SWQOKODSQALRPCLNMEQG"
+      RABBITMQ_DEFAULT_USER: "rabbitmq"
+      RABBITMQ_DEFAULT_PASS: "rabbitmq"
+      RABBITMQ_DEFAULT_VHOST: "/"
+    ports:
+      - "15672:15672"
+      - "5672:5672"
+    networks:
+      - app
+  products:
+    container_name: products
+    image: jonasssneto/products-go
+    ports:
+      - "8000:8000"
+    networks:
+      - app
+    depends_on:
+      - db
+      - rabbit
+    environment:
+      DATABASE_URL: "postgres://postgres:admin@db:5432/postgres?sslmode=disable"
+      PORT: ":8000"
+  payment:
+    container_name: payment
+    image: jonasssneto/payment-go
+    networks:
+      - app
+    depends_on:
+      - db
+      - rabbit
+    environment:
+      DATABASE_URL: "postgres://postgres:admin@db:5432/postgres?sslmode=disable"
+      AMQP_URL: "amqp://rabbitmq:rabbitmq@rabbit:5672"
+  order:
+    container_name: order
+    image: jonasssneto/order-go
+    ports:
+      - "8002:8002"
+    networks:
+      - app
+    depends_on:
+      - db
+      - rabbit
+    environment:
+      DATABASE_URL: "postgres://postgres:admin@db:5432/postgres?sslmode=disable"
+      AMQP_URL: "amqp://rabbitmq:rabbitmq@rabbit:5672"
+  checkout:
+    container_name: checkout
+    image: jonasssneto/checkout-go
+    ports:
+      - "8001:8001"
+    networks:
+      - app
+    depends_on:
+      - db
+      - rabbit
+    environment:
+      PORT=: ":8001"
+      AMQP_URL: "amqp://rabbitmq:rabbitmq@rabbit:5672"
+      PRODUCTS_API_URL: "http://localhost:8000"
+
+volumes:
+  pgdata: {}
+
+networks:
+  app:
+    driver: bridge
